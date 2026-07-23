@@ -1,10 +1,14 @@
 # UI Context
 
 ## Theme
-Simple, modern, minimalistic — inspired by Greenhouse ATS's clean recruiting
-UI, but in a blue tone instead of Greenhouse's green. Lots of white space,
-clear typographic hierarchy, restrained use of color (color is used for
-status/meaning, not decoration).
+Simple, modern, minimalistic — revised reference point is **HubSpot CRM**
+in a blue tone (originally scoped against Greenhouse ATS; the user later
+pointed at HubSpot specifically for the list/detail layout, same "lots of
+white space, low-density list view" spirit either way). Clear typographic
+hierarchy, restrained use of color (color is used for status/meaning, not
+decoration). List views in particular should show only the essential
+columns — resist the urge to add more columns just because a field
+exists; that's what the detail page is for.
 
 ## Colors
 Define as CSS variables / Tailwind theme extension so they're used
@@ -15,14 +19,28 @@ consistently rather than hardcoded per component.
   `#2563EB` for primary actions/links/active states).
 - **Neutrals**: gray scale for text/borders/backgrounds (`gray-50`–`gray-900`),
   white background for main content areas.
-- **Status colors** (used consistently across table, kanban, and badges):
-  - `DNR 1 / DNR 2 / DNR 3` — neutral gray, slightly darkening per attempt
-  - `Invalid Number` — red
-  - `Qualified` — amber/yellow
-  - `Interested` — blue
-  - `Hot Prospect` — orange
-  - `Meeting Done` — green
+- **Status colors** (used consistently across table, kanban, and badges;
+  revised per the user's explicit color spec — supersedes the original
+  amber/orange/darkening-gray scheme):
+  - `DNR 1 / DNR 2 / DNR 3` — flat gray (one shade, not tiered)
+  - `Connected` — light green shade (lighter than Qualified/Hot Prospect)
+  - `Invalid Number` — black background, white text
+  - `Not Interested` — red
+  - `Qualified` — green
+  - `Interested` — blue (unchanged, not part of the revision)
+  - `Hot Prospect` — green (same shade as Qualified per the literal spec —
+    flagged to the user that this makes the two indistinguishable at a
+    glance in the table; revisit with a distinct shade if that's an issue)
+  - `Meeting Done` — green (unchanged, not part of the revision — now a
+    third status sharing this shade, same flag as above)
 - Never introduce a new color for a new status without adding it here first.
+- **Pipeline statuses**: `Connected` and `Not Interested` were added
+  (migration `0006_add_lead_statuses.sql`) alongside a color-scheme
+  request — not explicitly confirmed where exactly they sit in the funnel,
+  proceeded as a logged default (`Connected` after the DNR attempts,
+  `Not Interested` as a terminal outcome alongside `Invalid Number`) since
+  adding an enum value is low-risk to be wrong about. See
+  `progress-tracker.md`.
 
 ## Typography
 - Sans-serif throughout — Inter (or similar geometric/humanist sans).
@@ -45,23 +63,89 @@ consistently rather than hardcoded per component.
 - lucide-react for all icons — no mixed icon sets.
 
 ## Layout Patterns
-- **App shell**: fixed left sidebar for navigation (Leads, Pipeline,
-  Dashboard, Users [Admin only]), top bar with global search + quick filters
-  + current user menu.
-- **Leads list**: table view as default, with a view toggle to switch to a
-  **Kanban pipeline view** (columns = Status values).
-- **Lead detail**: opens in a right-side slide-over drawer (not a full page
-  navigation) so reps can quickly move between leads while keeping list
-  context — contains contact info, call button, notes, activity/call history.
+- **App shell**: fixed left sidebar for navigation — Dashboard (Admin
+  only, first item), Leads, Pipeline (not built yet), Users (Admin only).
+  Top bar with current user menu. Global search currently lives on the
+  Leads page itself, not the shared top bar — there's nothing else to
+  search yet; promote it once a second searchable area exists.
+- **Leads list**: minimal HubSpot-style columns only — Name, Phone, Lead
+  Owner (BDE), Assigned To, Last Activity, Status. Server-side paginated
+  (not a full unbounded fetch — the org has 30k+ leads) with a search box
+  matching Name/Email/Phone. A view toggle to a **Kanban pipeline view**
+  (columns = Status values) is still planned but not built yet.
+- **Lead detail is a full page** (`/leads/[id]`), **not a drawer** —
+  reversed from the original slide-over decision once the user confirmed
+  they want to navigate to a dedicated page (their HubSpot-style reference
+  screenshot showed this explicitly). Three-column layout:
+  - **Left** — profile card: avatar/initials, name, **blue** (primary,
+    filled) quick-action buttons (Note / Call / Task — "Call" logs a call
+    activity immediately), key info (Lead Owner, Assigned To, Phone,
+    Email, LinkedIn, VISA status, Graduation date), a Status dropdown, an
+    Edit button.
+  - **Center** — a unified activity timeline behind tabs (All Activities /
+    Notes / Calls / Tasks — **selected tab is blue/primary-filled**, not
+    the shadcn default white/background), newest first, with a composer
+    at the top (a note composer, or a task composer with a due date,
+    depending on the active tab). Every meaningful change appears here:
+    assignment, status change, call logged, note added, task
+    added/completed.
+  - **Right** — a "Previous" (gray/secondary) / "Next Lead" (blue/primary)
+    button pair above the Deals & Payments panel, navigating within the
+    default newest-first lead order (ties broken by id, since a CSV batch
+    insert gives every row in that batch an identical `created_at`).
+    Below that: Deals & Payments — package/price/services/offer date per
+    deal, each with a collected/pending payment summary + progress bar
+    and a "Log Payment" action.
+  This 3-column profile/activity/side-panel pattern is the reusable
+  template for any future full-page detail view in this app, not a
+  one-off for leads specifically.
+  - **Read-only viewing**: since any provisioned user can now read any
+    lead (see `architecture.md` "Company-wide read"), a viewer who can't
+    edit the current lead sees an amber banner ("You're viewing this lead
+    read-only...") and every edit affordance — status dropdown, reassign,
+    Edit button, quick actions, composers, Add Deal/Log Payment — is
+    hidden or disabled rather than present-but-silently-failing.
+- **Admin Dashboard** (`/dashboard`, Admin only): stat tiles (Qualified /
+  Hot Prospects / Meeting Done / Total Collected) at the top, two bar
+  charts (payments collected by month, payment contribution by Sales rep
+  — plain CSS bars per the `dataviz` skill's mark specs: ≤24px thick, 4px
+  rounded tops, uniform brand-blue since these are magnitude-not-identity
+  charts), a two-card team breakdown (Sales pipeline totals / BDE leads
+  added), and two performance tables (Sales: calls made, qualified leads,
+  closers, total collected; BDE: leads added, qualified+). "Closer" =
+  a deal with at least one payment logged, credited to `offered_by` —
+  confirmed with the user; a second/third payment on the same deal
+  doesn't count again.
+- **Inline action feedback**: every action button shows a loading state
+  while pending, then a small green success line or a red (always
+  friendly, never a raw error) line directly under the button —
+  `useActionStatus()` + `<ActionFeedback/>`, see `code-standards.md`. Not
+  a toast — the feedback sits with the control that triggered it.
+- **Loading/error states**: every route that fetches data has a
+  `loading.tsx` (shadcn `Skeleton` blocks shaped like the real content —
+  table rows, stat tiles, the 3-column detail layout) and an `error.tsx`
+  (shared `<RouteError/>`: icon, one-line message, "Try again" button that
+  calls `reset()`) — per the standing `code-standards.md` rule, actually
+  implemented now rather than just documented.
+- **Brand mark**: `<BrandMark/>` (`components/layout/brand-mark.tsx`) — a
+  small blue-square lightning-bolt glyph + "NovaCRM" wordmark, `size="lg"`
+  centered on auth/pending-setup screens, default size in the sidebar.
+  Reuse it rather than re-inlining the logo mark.
+- **Active nav state**: sidebar links use `<NavLink/>`
+  (`components/layout/nav-link.tsx`, the one client-boundary piece of the
+  otherwise-server `AppShell`) — highlights via `bg-sidebar-accent` when
+  the current path matches or is nested under the link's `href`.
 - **Filters**: a filter bar above the table/kanban (BDE, Sales rep, status,
   date range, VISA status, graduation date, follow-up due) — filters are
-  combinable, not mutually exclusive.
+  combinable, not mutually exclusive. Not built yet (still Phase 2).
 - **Add Lead / CSV Import**: modal dialog, with a tab or toggle between
   "Add manually" and "Import CSV" (CSV path includes a column-mapping step
   before confirming import).
 - **Admin / Users**: simple table of users with role/team badges and
   inline actions (change role, change team, deactivate) — no separate
-  heavyweight admin panel needed for v1.
+  heavyweight admin panel needed for v1. An "Invite User" button (email
+  input) sends a Clerk invitation — the only way to join now that public
+  sign-up is off (see `architecture.md` "Invite-only").
 
 ## Icons
 - lucide-react exclusively, sized consistently (`16px` inline with text,

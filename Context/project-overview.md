@@ -21,8 +21,10 @@ tool used only by Nova Staffs staff to manage outreach to job-seeker leads.
   automatically logged against the lead.
 - Give Admin and Team Leads a real-time dashboard with filters to spot
   stalled leads, missed follow-ups, and team performance.
-- Enforce strict, role-based visibility so reps only see what they own,
-  while leadership sees everything.
+- Enforce role-based **edit** rights so reps only change what they own
+  (any rep can *view* every lead read-only — confirmed with the user as a
+  deliberate broadening from the original "own records only" design),
+  while leadership can edit everything.
 - Support fast lead entry, including bulk CSV import from BDEs.
 
 ## Core User Flow
@@ -42,22 +44,63 @@ tool used only by Nova Staffs staff to manage outreach to job-seeker leads.
 ## Features
 - Lead CRUD with all fields from the knowledge base (Name, Phone, Email,
   LinkedIn, VISA status, Graduation date, Lead by, Assigned to, Status,
-  Notes, Date called, Next follow-up).
+  Next follow-up). Notes/call history live in the unified activity
+  timeline, not a flat `notes` field (see below).
+- HubSpot-style minimal list view (Name, Phone, Lead Owner, Assigned To,
+  Last Activity, Status), server-side paginated and searchable by
+  Name/Email/Phone — built for tens of thousands of leads, not a few
+  hundred (see Scale note below).
+- Lead detail is a **full page**, not a drawer: a 3-column layout —
+  profile/key-info + quick actions on the left, a unified, tab-filterable
+  activity timeline (All / Notes / Calls / Tasks) in the center, and a
+  Deals & Payments panel on the right.
+- Every meaningful change to a lead is logged as a timeline activity:
+  created (implicit, from the lead's own timestamp), assigned, status
+  changed, call logged, note added, task added/completed. Clicking "Call"
+  logs the timestamp immediately; the rep only fills in the outcome
+  afterward.
+- **Deals & Payments** (placement package sold, price, services included,
+  who offered it, and a payment ledger showing collected vs. pending) —
+  see the amended Out of Scope note below.
 - CSV bulk import for leads — only Name and Phone are mandatory; a mapping
   step lets the importer match CSV columns to CRM fields; duplicate-phone
-  detection flags (not silently blocks) likely duplicates.
-- Pipeline / Kanban board view grouped by Status, plus a filterable table view.
-- Dashboard with filters: by BDE, by Sales rep, by Status, by date range,
-  by VISA status, by graduation date, by "follow-up due today/overdue".
+  detection flags (not silently blocks) likely duplicates. Built for
+  30,000+ row imports specifically (chunked/batched, not one request).
+- Pipeline / Kanban board view grouped by Status, plus the filterable
+  table view above (not built yet).
+- A filter bar (by BDE, by Sales rep, by Status, by date range, by VISA
+  status, by graduation date, by "follow-up due today/overdue") on the
+  Leads list itself — not built yet, distinct from the Admin Dashboard
+  below.
+- **Admin Dashboard** (`/dashboard`, Admin-only): stat tiles (Qualified,
+  Hot Prospects, Meeting Done, Total Collected), a payments-by-month chart
+  and a payments-by-Sales-rep contribution chart, a Sales/BDE team
+  breakdown, and two per-user performance tables — Sales (calls made,
+  qualified leads, closers, total collected) and BDE (leads added,
+  qualified+). "Closer" = first payment logged against a deal (later
+  payments on the same deal don't count again) — confirmed with the user.
 - One-click outbound calling via Zoom Phone from a lead record, with the
   call automatically logged (timestamp, duration, outcome) to that lead's
-  activity history.
+  activity timeline.
 - Role-based user management: Admin can add, remove, deactivate, and manage
   users, including assigning them to a team (Sales/BDE) and a role
-  (Admin, Team Lead, Rep).
-- Per-lead notes and a chronological activity/call history.
+  (Admin, Team Lead, Rep). **Invite-only**: public self-serve sign-up is
+  off — the only way to join is an Admin-sent Clerk invitation email.
+- Every action (add note, log call, change status, reassign, etc.) shows
+  inline loading/success/error feedback under the triggering control —
+  never a raw technical error, always a friendly message or a generic
+  "Something went wrong."
 - Follow-up reminders surfaced on each rep's dashboard.
-- Simple, modern, minimal UI in a blue tone, in the spirit of Greenhouse ATS.
+- Simple, modern, minimalist UI in a blue tone, HubSpot-inspired (revised
+  from the original Greenhouse-ATS reference — same spirit: lots of white
+  space, restrained color, information density kept low on the list view).
+
+## Scale
+Expect **30,000+ leads** imported via CSV, not a few hundred — this shapes
+several decisions: the leads list is paginated (not a full unbounded
+fetch), search uses Postgres trigram indexes (`pg_trgm`) rather than a
+plain `LIKE` scan, and CSV import is designed for chunked/batched inserts
+rather than one giant request.
 
 ## Scope
 
@@ -72,7 +115,13 @@ tool used only by Nova Staffs staff to manage outreach to job-seeker leads.
 - Candidate-facing features from the Nova Staffs website/knowledge base
   (resume building, ATS optimization, placement guarantees, etc.).
 - Email marketing / SMS drip campaigns.
-- Payroll, invoicing, or commission calculation.
+- **Payroll or commission calculation** for Nova Staffs employees stays out
+  of scope. **Lightweight deal/payment tracking on a lead** (package sold,
+  price, a payment ledger showing collected vs. pending) is now **in
+  scope** — this is tracking what was sold to/collected from a candidate,
+  not automating staff pay. Revised from the original blanket "invoicing"
+  exclusion once the user confirmed this was a real requirement, not just
+  UI inspiration.
 - Multi-tenant support (this CRM serves one organization: Nova Staffs).
 - Native mobile app (a responsive web app is sufficient for v1).
 - Automatic lead assignment / round-robin (assignment is manual by Admin/Team Lead in v1).
@@ -87,5 +136,7 @@ tool used only by Nova Staffs staff to manage outreach to job-seeker leads.
 - Admin can filter/search leads by any combination of BDE, Sales rep,
   status, date range, VISA status, and graduation date, and get correct results.
 - Admin can add, remove, or change the role/team of any user without needing
-  a developer to intervene.
-- No rep can see another rep's leads unless they are a Team Lead or Admin.
+  a developer to intervene, and can invite new users by email (no public
+  sign-up).
+- Any rep can view any lead read-only; no rep can **edit** another rep's
+  lead unless they are a Team Lead or Admin.

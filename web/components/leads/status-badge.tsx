@@ -4,12 +4,14 @@ import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<LeadStatus, string> = {
   dnr_1: "bg-gray-100 text-gray-700",
-  dnr_2: "bg-gray-200 text-gray-800",
-  dnr_3: "bg-gray-300 text-gray-900",
-  invalid_number: "bg-red-100 text-red-700",
-  qualified: "bg-amber-100 text-amber-800",
+  dnr_2: "bg-gray-100 text-gray-700",
+  dnr_3: "bg-gray-100 text-gray-700",
+  connected: "bg-green-50 text-green-600",
+  invalid_number: "bg-black text-white",
+  not_interested: "bg-red-100 text-red-700",
+  qualified: "bg-green-100 text-green-700",
   interested: "bg-blue-100 text-blue-700",
-  hot_prospect: "bg-orange-100 text-orange-700",
+  hot_prospect: "bg-green-100 text-green-700",
   meeting_done: "bg-green-100 text-green-700",
 };
 

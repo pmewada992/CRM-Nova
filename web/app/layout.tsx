@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import { shadcn } from "@clerk/ui/themes";
-import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,14 +31,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ClerkProvider
           appearance={{
-            theme: shadcn,
             variables: {
-              fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+              fontFamily:
+                "var(--font-geist-sans, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, sans-serif",
             },
           }}
         >
           {children}
-          <Toaster />
         </ClerkProvider>
       </body>
     </html>

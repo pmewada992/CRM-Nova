@@ -11,9 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/types/database";
 import type { LeadFormInput } from "@/lib/validations/lead";
 import type { LeadWithNames } from "@/lib/actions/leads";
+import { friendlyMessage } from "@/lib/hooks/use-action-status";
 
 type AssignableUser = { id: string; name: string };
 
@@ -22,7 +22,6 @@ export function LeadForm({
   canAssign,
   bdeUsers,
   salesUsers,
-  showStatus,
   onSubmit,
   onCancel,
 }: {
@@ -30,7 +29,6 @@ export function LeadForm({
   canAssign: boolean;
   bdeUsers: AssignableUser[];
   salesUsers: AssignableUser[];
-  showStatus: boolean;
   onSubmit: (input: LeadFormInput) => Promise<void>;
   onCancel?: () => void;
 }) {
@@ -45,8 +43,6 @@ export function LeadForm({
     graduation_date: lead?.graduation_date ?? "",
     lead_by: lead?.lead_by ?? undefined,
     assigned_to: lead?.assigned_to ?? undefined,
-    status: lead?.status,
-    notes: lead?.notes ?? "",
     next_followup: lead?.next_followup ?? "",
   });
 
@@ -61,7 +57,7 @@ export function LeadForm({
       try {
         await onSubmit(values);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+        setError(friendlyMessage(err));
       }
     });
   }
@@ -141,7 +137,7 @@ export function LeadForm({
             </Select>
           </div>
         )}
-        {canAssign && (
+        {canAssign && !lead && (
           <div className="space-y-1.5">
             <Label>Assigned to (Sales)</Label>
             <Select
@@ -161,26 +157,6 @@ export function LeadForm({
             </Select>
           </div>
         )}
-        {showStatus && (
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select
-              value={values.status}
-              onValueChange={(v) => set("status", v as LeadFormInput["status"])}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAD_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {LEAD_STATUS_LABELS[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
         <div className="space-y-1.5">
           <Label htmlFor="next_followup">Next Follow-up</Label>
           <Input
@@ -190,15 +166,6 @@ export function LeadForm({
             onChange={(e) => set("next_followup", e.target.value)}
           />
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="notes">Notes</Label>
-        <textarea
-          id="notes"
-          className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
-          value={values.notes}
-          onChange={(e) => set("notes", e.target.value)}
-        />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-2">

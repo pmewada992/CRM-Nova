@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { LEAD_STATUSES } from "@/types/database";
 
 export const leadFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -10,9 +9,24 @@ export const leadFormSchema = z.object({
   graduation_date: z.string().trim().optional().or(z.literal("")),
   lead_by: z.string().uuid().optional().nullable(),
   assigned_to: z.string().uuid().optional().nullable(),
-  status: z.enum(LEAD_STATUSES).optional(),
-  notes: z.string().trim().optional().or(z.literal("")),
   next_followup: z.string().trim().optional().or(z.literal("")),
 });
 
 export type LeadFormInput = z.infer<typeof leadFormSchema>;
+
+/** One row of a CSV import — only Name + Phone are mandatory. */
+export const csvRowSchema = z.object({
+  name: z.string().trim().min(1),
+  phone: z.string().trim().min(1),
+  email: z.string().trim().optional(),
+  linkedin: z.string().trim().optional(),
+  visa_status: z.string().trim().optional(),
+  graduation_date: z.string().trim().optional(),
+});
+
+export type CsvRowInput = z.infer<typeof csvRowSchema>;
+
+export const csvImportBatchSchema = z.object({
+  leadBy: z.string().uuid().nullable(),
+  rows: z.array(csvRowSchema).min(1).max(1000),
+});

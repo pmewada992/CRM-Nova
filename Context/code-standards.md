@@ -61,6 +61,43 @@
   client-supplied `role` or `userId`.
 - Zoom API calls are isolated in `/lib/zoom.ts` — route handlers call this
   module, they don't build Zoom requests inline.
+- **CSV import** (`/api/csv-import`) is deliberately a Route Handler
+  called via `fetch` from a client component in batches (500 rows/request,
+  chunked client-side after parsing the whole file), not a single request
+  with the whole file — built for 30,000+ row imports, and a single
+  giant request risks serverless function timeouts with zero progress
+  feedback. Client-side CSV parsing uses `papaparse` (not a hand-rolled
+  splitter) — real CSVs have quoted fields with embedded commas/quotes
+  that a naive `.split(',')` mangles.
+
+## Error Messages (Server Actions & Route Handlers)
+- **Mask, don't rely on error classes surviving the client boundary.**
+  Thrown errors from a Server Action reach a Client Component as a plain
+  `Error` — a custom subclass's identity (`PermissionError`,
+  `ValidationError`, both in `lib/permissions.ts`) does **not** survive
+  serialization, only `.message` does. So the safe/unsafe split happens at
+  the **throw site** (server), not the catch site (client):
+  - Deliberate, human-readable messages (validation failures,
+    permission denials, business rules like "You can't deactivate your
+    own account.") are thrown as-is via `ValidationError`/`PermissionError`
+    — these display verbatim.
+  - Raw Supabase/Postgres errors are **never** forwarded — every
+    `if (error) throw ...` for a DB call throws a fixed
+    `new Error("Something went wrong.")` instead of `error.message`.
+  - `lib/hooks/use-action-status.ts`'s `friendlyMessage()` on the client
+    just displays whatever `.message` arrives, trusting the server already
+    did the masking — it does **not** attempt an `instanceof` check
+    against `lib/permissions.ts` classes (that file is `server-only` and
+    importing it into client code fails the build outright).
+- **Inline feedback, not toasts**, for form/action results: `useActionStatus()`
+  wraps a Server Action call with pending/success/error state;
+  `<ActionFeedback status={...} />` (`components/ui/action-feedback.tsx`)
+  renders green success / red error text under the triggering button,
+  success auto-clearing after ~3s. Loading state disables the button via
+  `isPending` from the same hook. Established across
+  `profile-card.tsx`/`activity-feed.tsx`/`deals-panel.tsx`/
+  `users-table.tsx` — new interactive actions should follow the same
+  pattern rather than reaching for `sonner`'s `toast.error`.
 
 ## Data and Storage
 - Supabase server-side client uses the service role key only inside server
@@ -80,26 +117,36 @@ Project root is `/web` (sibling to `/Context`). Actual layout:
 ```
 /web
   /app
-    /(auth)/sign-in/[[...sign-in]]/...
-    /(auth)/sign-up/[[...sign-up]]/...
+    /sign-in/[[...sign-in]]/... (top-level, not a route group — the Clerk
+                                 CLI expects this exact path; a route
+                                 group doesn't change the URL anyway)
+    /sign-up/[[...sign-up]]/...
     /(app)/layout.tsx        (sidebar/topbar shell, "pending setup" gate)
-    /(app)/leads/...
+    /(app)/leads/page.tsx    (list: search + pagination)
+    /(app)/leads/[id]/page.tsx (full-page detail, 3-column layout)
     /(app)/users/layout.tsx  (admin-only guard)
     /(app)/users/...
+    /(app)/dashboard/layout.tsx (admin-only guard, same pattern as users/)
+    /(app)/dashboard/page.tsx
     /(app)/pipeline/...      (Phase 2)
     /api/webhooks/clerk/route.ts
-    /api/csv-import/...      (Phase 2)
+    /api/csv-import/route.ts (chunked batch insert, see code-standards
+                              "CSV Import" note below)
     /api/zoom/...            (Phase 3)
     proxy.ts                 (was middleware.ts pre-Next-16)
   /components
-    /ui/           (shadcn primitives)
+    /ui/           (shadcn primitives, + action-feedback.tsx)
     /layout/       (app-shell.tsx)
-    /leads/
+    /leads/        (list view, shared LeadForm, status-badge, csv-import.tsx)
+    /leads/detail/ (profile-card, activity-feed, deals-panel — the
+                    3-column detail-page components)
+    /dashboard/    (stat-tile, bar-chart, team-breakdown, performance-tables)
     /users/
   /lib
     supabase.ts    (RLS-scoped client + service-role admin client)
     permissions.ts (role/team scoping helpers, shared by Server Actions)
-    /actions/      (leads.ts, users.ts — Server Actions)
+    /hooks/        (use-action-status.ts — inline pending/success/error)
+    /actions/      (leads.ts, activities.ts, deals.ts, users.ts, dashboard.ts)
     /validations/  (zod schemas)
     zoom.ts        (Phase 3)
   /types

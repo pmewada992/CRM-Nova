@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Users2, ListChecks } from "lucide-react";
+import { Users2, ListChecks, LayoutDashboard } from "lucide-react";
+import { NavLink } from "@/components/layout/nav-link";
+import { BrandMark } from "@/components/layout/brand-mark";
 import type { AppUser } from "@/types/database";
 
 export function AppShell({
@@ -13,30 +14,30 @@ export function AppShell({
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-56 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
-        <div className="px-4 py-4 text-lg font-semibold">NovaCRM</div>
+        <div className="px-4 py-4">
+          <BrandMark />
+        </div>
         <nav className="flex flex-col gap-1 px-2">
-          <Link
-            href="/leads"
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <ListChecks size={16} />
-            Leads
-          </Link>
           {user.role === "admin" && (
-            <Link
-              href="/users"
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Users2 size={16} />
+            <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />}>
+              Dashboard
+            </NavLink>
+          )}
+          <NavLink href="/leads" icon={<ListChecks size={16} />}>
+            Leads
+          </NavLink>
+          {user.role === "admin" && (
+            <NavLink href="/users" icon={<Users2 size={16} />}>
               Users
-            </Link>
+            </NavLink>
           )}
         </nav>
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b px-6">
           <div className="text-sm text-muted-foreground">
-            {user.name} &middot; <span className="capitalize">{user.role?.replace("_", " ")}</span>
+            <span className="font-medium text-foreground">{user.name}</span>{" "}
+            <span className="capitalize">&middot; {user.role?.replace("_", " ")}</span>
             {user.team && <span className="capitalize"> &middot; {user.team}</span>}
           </div>
           <UserButton />

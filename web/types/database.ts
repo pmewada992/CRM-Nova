@@ -8,7 +8,9 @@ export const LEAD_STATUSES = [
   "dnr_1",
   "dnr_2",
   "dnr_3",
+  "connected",
   "invalid_number",
+  "not_interested",
   "qualified",
   "interested",
   "hot_prospect",
@@ -20,7 +22,9 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   dnr_1: "DNR 1",
   dnr_2: "DNR 2",
   dnr_3: "DNR 3",
+  connected: "Connected",
   invalid_number: "Invalid Number",
+  not_interested: "Not Interested",
   qualified: "Qualified",
   interested: "Interested",
   hot_prospect: "Hot Prospect",
@@ -49,28 +53,46 @@ export interface Lead {
   lead_by: string | null;
   assigned_to: string | null;
   status: LeadStatus;
-  notes: string | null;
-  date_called: string | null;
   next_followup: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface CallLog {
+export type ActivityType = "assigned" | "status_changed" | "call" | "note" | "task";
+
+export interface LeadActivity {
   id: string;
   lead_id: string;
-  caller_id: string;
+  type: ActivityType;
+  created_by: string;
+  created_at: string;
+  body: string | null;
+  old_status: LeadStatus | null;
+  new_status: LeadStatus | null;
+  old_assigned_to: string | null;
+  new_assigned_to: string | null;
+  call_outcome: string | null;
+  call_duration_seconds: number | null;
   zoom_call_id: string | null;
-  started_at: string;
-  duration_seconds: number | null;
-  outcome: string | null;
+  task_due_date: string | null;
+  task_completed_at: string | null;
 }
 
-export interface StatusHistoryEntry {
+export interface Deal {
   id: string;
   lead_id: string;
-  old_status: LeadStatus | null;
-  new_status: LeadStatus;
-  changed_by: string;
-  changed_at: string;
+  package_name: string;
+  price: number;
+  services: string | null;
+  offer_date: string;
+  offered_by: string;
+  created_at: string;
+}
+
+export interface Payment {
+  id: string;
+  deal_id: string;
+  amount: number;
+  collected_at: string;
+  created_at: string;
 }
