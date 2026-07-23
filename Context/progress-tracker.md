@@ -3,20 +3,17 @@
 ## Current Phase
 Phase 1 foundation + HubSpot-style redesign + company-wide read/owner-only
 write + invite-only auth + Admin Dashboard + inline-feedback pattern are
-all built and the font bug is genuinely fixed and user-confirmed (see
-Completed for the circular-CSS-variable root cause). Ran `/ponytail-audit`
-and applied all 6 findings (~586 lines, 345 packages removed). Most
-recently: a status-color overhaul (new `Connected`/`Not Interested`
-statuses, a full recolor per the user's spec), blue quick-action/tab
-styling, and Previous/Next Lead navigation. Typecheck/lint/build clean;
-**not yet confirmed in-browser by the user**.
+all built, deployed to Netlify, and user-confirmed live in a real browser.
+Most recently: a pending-invite user lifecycle ("Invite Sent" row created
+on invite, claimed by the Clerk webhook on real sign-up) and two new lead
+statuses (`New Lead` default, `Enrolled` terminal). Typecheck/lint/build
+clean; **not yet confirmed in-browser by the user**.
 
 ## Current Goal
-User confirms in-browser: the new status colors and blue buttons/tabs
-look right, Previous/Next Lead navigation works (including across a CSV
-batch where many leads share one `created_at`), and "Connected"/
-"Not Interested" show up correctly in the status dropdown. Then: a real
-CSV import, and the rest of Phase 2 (Kanban, filter bar).
+User confirms in-browser: inviting someone creates an "Invite Sent" row,
+a real sign-up via that invite claims it and removes the pending state,
+and "New Lead"/"Enrolled" show up correctly in the status dropdown/table.
+Then: a real CSV import, and the rest of Phase 2 (Kanban, filter bar).
 
 ## Completed
 - Reviewed Nova Staffs knowledge base; confirmed team structure (8 reps: 5
@@ -377,12 +374,41 @@ CSV import, and the rest of Phase 2 (Kanban, filter bar).
   `created_at` alone would make navigation get stuck within a batch.
 - `npx tsc --noEmit` / `npx eslint .` / `npm run build` all clean (build
   run only after confirming no dev server was live, per the lesson above).
+- **Deployed to Netlify for real** (`@netlify/plugin-nextjs`, from GitHub):
+  fixed the base-directory routing (`netlify.toml`'s `base = "web"`), set
+  all 10 required env vars (`NEXT_PUBLIC_APP_URL` now the real
+  `https://novastaffscrm.netlify.app`, not localhost), and switched
+  `next build` from Turbopack to `--webpack` — Turbopack's edge-function
+  bundle referenced a missing runtime chunk under Netlify's Edge Function
+  wrapper (only reproduced via Netlify CLI's local build path, not on
+  Netlify's own Linux-hosted CI, and traced to a Windows-specific local
+  bundling bug rather than an app problem). User confirmed the live site
+  opens correctly in a real browser.
+- **Pending-invite user lifecycle + two new lead statuses** (user-reported
+  bugs after the Netlify deploy): migrations `0007` (`new_lead` before
+  `dnr_1`, `enrolled` after `meeting_done`), `0008` (`leads.status` default
+  → `new_lead`), `0009` (`users.clerk_user_id` now nullable). `inviteUser()`
+  now inserts a placeholder `users` row right after the Clerk invite sends
+  (`clerk_user_id: null`) so the Admin can pre-assign role/team before
+  sign-up; the `user.created` webhook claims that row by email match
+  instead of inserting a duplicate. New `removeUser()` action (guarded to
+  only ever delete a still-pending row). `users-table.tsx` shows an
+  "Invite Sent" badge + "Remove" action for pending rows. `dashboard.ts`'s
+  qualified+ calc now includes `enrolled`. See `architecture.md` "Pending
+  invite rows" and `ui-context.md`'s status color table.
+- Also fixed stray `.netlify/edge-functions/` build artifacts (leftover
+  from local Netlify CLI deploy attempts) flooding `eslint .` with
+  vendored-code errors — deleted the directory and added `.netlify/**` to
+  `eslint.config.mjs`'s `globalIgnores` so it can't recur.
+- `npx tsc --noEmit` / `npx eslint .` / `npm run build` all clean (dev
+  server stopped first, per the standing lesson, then restarted after).
 
 ## In Progress
-- This session's status/color/navigation work is code-complete and
-  build-clean but not yet confirmed in-browser by the user. Still
-  separately unconfirmed from before: a real CSV import, a real invite
-  round-trip end-to-end, and the read-only-lead-viewing banner.
+- Still unconfirmed by the user in-browser: the new "Invite Sent"/"Remove"
+  pending-user flow end-to-end (invite → row appears → real sign-up claims
+  it), and the two new statuses showing correctly in the dropdown/table.
+  Separately still unconfirmed from before: a real CSV import, and the
+  read-only-lead-viewing banner.
 
 ## Next Up
 1. User confirms in-browser: open a lead that isn't theirs (read-only
@@ -583,3 +609,15 @@ resolve), not just substring presence.
   empty-state polish, a reusable brand mark) rather than a heavier visual
   redesign, matching the existing "simple, minimalist, HubSpot-toned"
   direction already in `ui-context.md`.
+- **Session 9**: Deployed to Netlify — debugged base-directory routing, a
+  fully-empty env var set, and a Windows-only local edge-bundling failure
+  in the Netlify CLI (resolved by switching `next build` to webpack and
+  letting Netlify's own Linux CI build it instead of the local CLI path).
+  User confirmed the live site works in a real browser. Then reported two
+  bugs from real usage: invited users weren't visible in the Users table
+  until they actually signed up (fixed with a pending-invite-row pattern —
+  see Completed), and the status dropdown was missing "New Lead" and
+  "Enrolled" (added via migrations 0007/0008, plus 0009 making
+  `clerk_user_id` nullable to support the pending row). Typecheck/lint/
+  build verified clean with the dev server stopped first, then restarted,
+  per the standing lesson about not building against a live dev server.

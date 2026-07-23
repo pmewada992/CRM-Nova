@@ -58,7 +58,14 @@ export async function setUserActive(userId: string, active: boolean) {
 
 const emailSchema = z.string().trim().email();
 
-/** Sends a Clerk invitation email — the only way to join now that public sign-up is off. */
+/**
+ * Sends a Clerk invitation email — the only way to join now that public
+ * sign-up is off — and immediately creates a placeholder `users` row
+ * (`clerk_user_id: null`) so the Admin can pre-assign role/team before the
+ * invitee actually signs up. The `user.created` webhook later fills in
+ * `clerk_user_id` on this same row (matched by email) instead of inserting
+ * a duplicate — see app/api/webhooks/clerk/route.ts.
+ */
 export async function inviteUser(email: string) {
   await requireAdmin();
   const parsed = emailSchema.safeParse(email);
@@ -85,4 +92,35 @@ export async function inviteUser(email: string) {
     }
     throw new Error("Failed to send invitation.");
   }
+
+  const supabase = createServerSupabaseClient();
+  const { data: existing, error: lookupError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", parsed.data)
+    .maybeSingle();
+  if (lookupError) throw new Error("Something went wrong.");
+  if (!existing) {
+    const { error } = await supabase.from("users").insert({
+      email: parsed.data,
+      name: parsed.data,
+      clerk_user_id: null,
+      active: true,
+    });
+    if (error) throw new Error("Something went wrong.");
+  }
+  revalidatePath("/users");
+}
+
+/** Removes a still-pending invite row (never a real, signed-up user — see the `clerk_user_id` guard). */
+export async function removeUser(userId: string) {
+  await requireAdmin();
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("users")
+    .delete()
+    .eq("id", userId)
+    .is("clerk_user_id", null);
+  if (error) throw new Error("Something went wrong.");
+  revalidatePath("/users");
 }

@@ -33,6 +33,11 @@ consistently rather than hardcoded per component.
     glance in the table; revisit with a distinct shade if that's an issue)
   - `Meeting Done` — green (unchanged, not part of the revision — now a
     third status sharing this shade, same flag as above)
+  - `New Lead` — flat slate/gray (`bg-slate-100 text-slate-700`), the
+    default status on creation (manual or CSV) — visually distinct from
+    the DNR gray so a fresh lead doesn't read as "already attempted"
+  - `Enrolled` — solid emerald (`bg-emerald-600 text-white`), the funnel's
+    terminal success state, placed after `Meeting Done`
 - Never introduce a new color for a new status without adding it here first.
 - **Pipeline statuses**: `Connected` and `Not Interested` were added
   (migration `0006_add_lead_statuses.sql`) alongside a color-scheme
@@ -145,7 +150,10 @@ consistently rather than hardcoded per component.
   inline actions (change role, change team, deactivate) — no separate
   heavyweight admin panel needed for v1. An "Invite User" button (email
   input) sends a Clerk invitation — the only way to join now that public
-  sign-up is off (see `architecture.md` "Invite-only").
+  sign-up is off (see `architecture.md` "Invite-only"). A just-invited
+  user shows a blue "Invite Sent" status badge and a "Remove" action
+  instead of the usual Active/Deactivate controls, until they actually
+  sign up (see `architecture.md` "Pending invite rows").
 
 ## Icons
 - lucide-react exclusively, sized consistently (`16px` inline with text,

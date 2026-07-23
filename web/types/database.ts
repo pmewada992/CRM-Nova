@@ -5,6 +5,7 @@ export const TEAMS = ["sales", "bde"] as const;
 export type Team = (typeof TEAMS)[number];
 
 export const LEAD_STATUSES = [
+  "new_lead",
   "dnr_1",
   "dnr_2",
   "dnr_3",
@@ -15,10 +16,12 @@ export const LEAD_STATUSES = [
   "interested",
   "hot_prospect",
   "meeting_done",
+  "enrolled",
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new_lead: "New Lead",
   dnr_1: "DNR 1",
   dnr_2: "DNR 2",
   dnr_3: "DNR 3",
@@ -29,11 +32,13 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   interested: "Interested",
   hot_prospect: "Hot Prospect",
   meeting_done: "Meeting Done",
+  enrolled: "Enrolled",
 };
 
 export interface AppUser {
   id: string;
-  clerk_user_id: string;
+  /** Null until the invited person actually signs up — see lib/actions/users.ts inviteUser(). */
+  clerk_user_id: string | null;
   name: string;
   email: string;
   role: Role | null;

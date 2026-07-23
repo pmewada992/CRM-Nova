@@ -7,7 +7,9 @@
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **Calling**: Zoom Phone REST API (full API-based click-to-call, OAuth app
   registered in the Zoom Marketplace)
-- **Hosting**: Vercel (assumed default; revisit if you have a preference)
+- **Hosting**: Netlify (`@netlify/plugin-nextjs`), deployed from GitHub —
+  superseded the original "Vercel assumed default" placeholder once the
+  user actually chose Netlify
 - **Icons**: lucide-react
 
 ## System Boundaries
@@ -29,6 +31,17 @@
   an invitation ticket that lets sign-up proceed at `/sign-up` despite
   restricted mode. `<SignIn/>` automatically stops rendering its "Sign up"
   footer link once restricted mode is on — verified in-app, not assumed.
+- **Pending invite rows**: `inviteUser()` also inserts a placeholder
+  `users` row (`clerk_user_id: null`, migration `0009` made this column
+  nullable) immediately after the Clerk invitation sends, so the Admin can
+  pre-assign role/team before the person actually signs up. The Clerk
+  webhook's `user.created` handler claims that row by email match (`update
+  ... where email = ? and clerk_user_id is null`) instead of inserting a
+  duplicate, falling back to a fresh insert only if no pending row exists.
+  A pending row shows as "Invite Sent" in the Users table with a "Remove"
+  action in place of the usual Deactivate control (`removeUser()` — guarded
+  by `clerk_user_id is null` so it can never delete a real, signed-up
+  user).
 - RLS policies read the caller's identity via `auth.jwt() ->> 'sub'`, which
   only resolves to the Clerk user id once **Clerk is added as a Supabase
   Third Party Auth provider** (Supabase dashboard > Authentication > Sign In
@@ -39,13 +52,15 @@
   template approach.
 
 ## Storage Model
-- `users` — clerk_user_id, name, email, role (`admin` | `team_lead` | `rep`),
+- `users` — clerk_user_id (**nullable**, migration `0009` — see "Pending
+  invite rows" below), name, email, role (`admin` | `team_lead` | `rep`),
   team (`sales` | `bde` | null for Admin), active (boolean), created_at
 - `leads` — name, phone, email, linkedin, visa_status, graduation_date,
   lead_by (FK → users, the BDE who added it), assigned_to (FK → users,
-  nullable until assigned), status (enum: `dnr_1`, `dnr_2`, `dnr_3`,
-  `invalid_number`, `qualified`, `interested`, `hot_prospect`,
-  `meeting_done`), next_followup, created_at, updated_at. Has GIN trigram
+  nullable until assigned), status (enum: `new_lead` (default), `dnr_1`,
+  `dnr_2`, `dnr_3`, `connected`, `invalid_number`, `not_interested`,
+  `qualified`, `interested`, `hot_prospect`, `meeting_done`, `enrolled` —
+  migrations `0006`–`0008`), next_followup, created_at, updated_at. Has GIN trigram
   indexes (`pg_trgm`) on `name`, `phone`, `email` for fast partial-match
   search at 30k+ row scale (plain `LIKE`/`ILIKE` doesn't use a btree index
   for `%term%` patterns), plus a plain btree index on `phone` (migration

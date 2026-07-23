@@ -22,7 +22,13 @@ export interface DashboardStats {
   bdePerformance: { userId: string; name: string; leadsAdded: number; qualifiedPlus: number }[];
 }
 
-const QUALIFIED_PLUS_STATUSES = ["qualified", "interested", "hot_prospect", "meeting_done"];
+const QUALIFIED_PLUS_STATUSES = [
+  "qualified",
+  "interested",
+  "hot_prospect",
+  "meeting_done",
+  "enrolled",
+];
 
 function monthKey(iso: string) {
   return iso.slice(0, 7); // "YYYY-MM"

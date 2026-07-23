@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROLES, TEAMS, type AppUser, type Role, type Team } from "@/types/database";
-import { setUserRoleTeam, setUserActive, inviteUser } from "@/lib/actions/users";
+import { setUserRoleTeam, setUserActive, inviteUser, removeUser } from "@/lib/actions/users";
 import { useActionStatus } from "@/lib/hooks/use-action-status";
 
 const NONE = "__none__";
@@ -73,6 +73,8 @@ function UserRow({ user }: { user: AppUser }) {
   const roleAction = useActionStatus();
   const teamAction = useActionStatus();
   const activeAction = useActionStatus();
+  const removeAction = useActionStatus();
+  const pending = user.clerk_user_id === null;
 
   function handleRoleChange(role: string) {
     roleAction.run(() =>
@@ -88,6 +90,10 @@ function UserRow({ user }: { user: AppUser }) {
 
   function handleToggleActive() {
     activeAction.run(() => setUserActive(user.id, !user.active));
+  }
+
+  function handleRemove() {
+    removeAction.run(() => removeUser(user.id));
   }
 
   return (
@@ -135,20 +141,37 @@ function UserRow({ user }: { user: AppUser }) {
         <ActionFeedback status={teamAction.status} />
       </TableCell>
       <TableCell>
-        <Badge variant={user.active ? "outline" : "secondary"}>
-          {user.active ? "Active" : "Deactivated"}
-        </Badge>
+        {pending ? (
+          <Badge variant="outline" className="border-transparent bg-blue-100 text-blue-700">
+            Invite Sent
+          </Badge>
+        ) : (
+          <Badge variant={user.active ? "outline" : "secondary"}>
+            {user.active ? "Active" : "Deactivated"}
+          </Badge>
+        )}
       </TableCell>
       <TableCell>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={activeAction.isPending}
-          onClick={handleToggleActive}
-        >
-          {user.active ? "Deactivate" : "Reactivate"}
-        </Button>
-        <ActionFeedback status={activeAction.status} />
+        {pending ? (
+          <>
+            <Button size="sm" variant="ghost" disabled={removeAction.isPending} onClick={handleRemove}>
+              Remove
+            </Button>
+            <ActionFeedback status={removeAction.status} />
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={activeAction.isPending}
+              onClick={handleToggleActive}
+            >
+              {user.active ? "Deactivate" : "Reactivate"}
+            </Button>
+            <ActionFeedback status={activeAction.status} />
+          </>
+        )}
       </TableCell>
     </TableRow>
   );
