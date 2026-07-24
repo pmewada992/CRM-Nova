@@ -23,7 +23,23 @@
   truth for lead data — call outcomes get written back into Supabase.
 - A Clerk webhook (`user.created` / `user.updated` / `user.deleted`) keeps a
   mirrored `users` row in Supabase in sync (id, clerk_user_id, name, email).
-  Role and team are set inside NovaCRM by the Admin, not by Clerk.
+  Role and team are set inside NovaCRM by the Admin, not by Clerk. The
+  endpoint (`https://novastaffscrm.netlify.app/api/webhooks/clerk`,
+  registered manually in Clerk Dashboard > Webhooks — this step isn't
+  scriptable via the Clerk CLI, the signing secret is a one-time reveal in
+  the browser) verifies requests with `CLERK_WEBHOOK_SIGNING_SECRET`. This
+  var was missing entirely for a stretch after the Netlify deploy, so
+  `user.created` silently never linked new sign-ups to their `users` row —
+  an Admin could assign a role to a pending invite row forever and the
+  real signed-in user would still resolve to nobody. Fixed by registering
+  the endpoint and setting the secret; two already-stuck real users were
+  manually re-linked by clerk_user_id as a one-time repair.
+- **Organizations are disabled** (`clerk disable orgs`) — this is a
+  single-org internal tool, so Clerk's org-creation/selection step (which
+  is on by default with `force_organization_selection`) has no reason to
+  show during sign-up. `first_name`/`last_name` are set `required: true`
+  on the Clerk instance instead, so `<SignUp/>` collects a real name
+  natively — no custom sign-up form needed for either change.
 - **Invite-only**: Clerk's `auth_access_control.sign_up_mode` is
   `"restricted"` (was `"public"`) — public self-serve sign-up is off.
   Admin invites someone via `inviteUser()` (`lib/actions/users.ts`, uses

@@ -403,12 +403,37 @@ Then: a real CSV import, and the rest of Phase 2 (Kanban, filter bar).
 - `npx tsc --noEmit` / `npx eslint .` / `npm run build` all clean (dev
   server stopped first, per the standing lesson, then restarted after).
 
+- **Fixed the org-creation prompt + the real "stuck on pending" bug**
+  (user-reported after trying real invites): Clerk's Organizations feature
+  was on with `force_organization_selection: true`, forcing every sign-up
+  through an org-creation screen — disabled via `clerk disable orgs` (no
+  code change; this is a single-org internal tool). Set `first_name`/
+  `last_name` to `required: true` on the Clerk instance so `<SignUp/>`
+  natively collects a name instead (also no code change). Root-caused the
+  "assigned a role but user still stuck on pending setup" bug: production
+  never had `CLERK_WEBHOOK_SIGNING_SECRET` set, so `user.created` never
+  linked a fresh sign-up to its `users` row no matter what role the Admin
+  assigned on the pending invite row. Registering an endpoint in Clerk
+  Dashboard's Webhooks UI (a one-time browser step — the signing secret is
+  revealed only once, not retrievable via the Clerk CLI/API) and setting
+  the secret via `netlify env:set` fixed it going forward; triggered a
+  remote rebuild via `netlify api createSiteBuild` (not a local build —
+  sidesteps the earlier Windows edge-bundling bug) so the fix is live
+  without a code push. Two already-stuck real users
+  (`gaurangs918@gmail.com`, `parthmwd87@gmail.com` — both really signed up
+  in Clerk, both already had roles assigned, both still had
+  `clerk_user_id: null` in Supabase) were manually re-linked as a one-time
+  repair rather than making them re-invite/re-sign-up.
+- Updated `architecture.md` for both fixes (webhook endpoint registration
+  + the "Organizations are disabled" note).
+
 ## In Progress
-- Still unconfirmed by the user in-browser: the new "Invite Sent"/"Remove"
-  pending-user flow end-to-end (invite → row appears → real sign-up claims
-  it), and the two new statuses showing correctly in the dropdown/table.
-  Separately still unconfirmed from before: a real CSV import, and the
-  read-only-lead-viewing banner.
+- Still unconfirmed by the user in-browser: a brand-new invite completing
+  the full loop end-to-end now that the webhook is wired up (sign-up →
+  name collected, no org prompt → webhook claims the row → Admin-assigned
+  role takes effect immediately), and the two new lead statuses showing
+  correctly in the dropdown/table. Separately still unconfirmed from
+  before: a real CSV import, and the read-only-lead-viewing banner.
 
 ## Next Up
 1. User confirms in-browser: open a lead that isn't theirs (read-only
@@ -417,10 +442,7 @@ Then: a real CSV import, and the rest of Phase 2 (Kanban, filter bar).
    a couple of actions show the right inline feedback (including a
    deliberately-triggered failure).
 2. A real CSV import (not just the synthetic-file test).
-3. Set up the Clerk webhook endpoint once deployed (or tunneled via
-   `clerk webhooks listen`) and fill in `CLERK_WEBHOOK_SIGNING_SECRET` —
-   needed so *future* sign-ups (via invitation, now) get a `users` row
-   automatically. Right now only the one bootstrapped Admin has a row.
+3. ~~Set up the Clerk webhook endpoint~~ — done, see Completed.
 4. Add a second test user to manually re-verify RLS: a rep should be able
    to **open** any lead but not edit one outside their scope, and should
    not be able to create a deal/log a call/etc. against a lead they don't
